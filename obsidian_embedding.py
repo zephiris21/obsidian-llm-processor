@@ -405,6 +405,26 @@ def process_vault_embeddings(config: Dict) -> Dict[str, Dict]:
     min_content_length = config.get("min_content_length", {}).get("embedding", 100)
     force_reprocess = config.get("force_reprocess", False)
     
+    # ==== 중요: 기존 임베딩 데이터 로드 ====
+    existing_data = {}
+    jsonl_path = config.get("embedding", {}).get("jsonl_path", "embeddings.jsonl")
+    
+    if os.path.exists(jsonl_path):
+        try:
+            print(f"기존 임베딩 데이터를 로드합니다: {jsonl_path}")
+            with open(jsonl_path, 'r', encoding='utf-8') as f:
+                for line in f:
+                    try:
+                        data = json.loads(line)
+                        path = data.get('path')
+                        if path and os.path.exists(path):  # 존재하는 파일만 포함
+                            existing_data[path] = data
+                    except json.JSONDecodeError:
+                        continue
+            print(f"기존 임베딩 데이터 {len(existing_data)}개 로드됨")
+        except Exception as e:
+            print(f"기존 임베딩 데이터 로드 실패: {e}")
+    
     # 병렬 처리 설정
     parallel = config.get("parallel_processing", False)
     num_workers = config.get("num_workers", 4)
@@ -426,6 +446,10 @@ def process_vault_embeddings(config: Dict) -> Dict[str, Dict]:
             
             # 이미 임베딩 되었는지 확인 (force_reprocess가 true면 무시)
             if not force_reprocess and check_process_status(frontmatter, "embedding"):
+                # 기존 임베딩 데이터가 있으면 재사용
+                if file_path in existing_data:
+                    print(f"  - 기존 임베딩 재사용 ({os.path.basename(file_path)})")
+                    return (file_path, existing_data[file_path])
                 print(f"  - 건너뜀: 이미 임베딩 처리됨 ({os.path.basename(file_path)})")
                 return None
             
@@ -495,7 +519,16 @@ def process_vault_embeddings(config: Dict) -> Dict[str, Dict]:
                 file_path, note_info = result
                 notes_data[file_path] = note_info
     
-    print(f"임베딩 생성 완료: {len(notes_data)}개 노트")
+    print(f"새 임베딩 생성 완료: {len(notes_data)}개 노트")
+    
+    # ==== 중요: 기존 데이터와 새 데이터 병합 ====
+    # 기존 임베딩 중 아직 notes_data에 없는 것들 추가
+    for path, data in existing_data.items():
+        if path not in notes_data and os.path.exists(path):
+            if 'embedding' in data:  # 임베딩 데이터가 있는지 확인
+                notes_data[path] = data
+    
+    print(f"통합된 임베딩 데이터: {len(notes_data)}개 노트 (새 임베딩: {len(notes_data) - len(existing_data)}, 기존 임베딩: {len(existing_data)})")
     
     # 임베딩 데이터 저장
     jsonl_path = config.get("embedding", {}).get("jsonl_path", "embeddings.jsonl")
@@ -532,6 +565,8 @@ def find_related_notes(notes_data: Dict[str, Dict], config: Dict) -> Dict[str, L
     similarity_threshold = embedding_config.get("similarity_threshold", 0.7)
     max_backlinks = embedding_config.get("max_backlinks", 7)
     
+    print(f"현재 설정: similarity_threshold={similarity_threshold}, max_backlinks={max_backlinks}")
+    
     # 각 노트별 관련 노트 저장용 딕셔너리
     related_notes = {}
     
@@ -539,7 +574,7 @@ def find_related_notes(notes_data: Dict[str, Dict], config: Dict) -> Dict[str, L
     note_paths = list(notes_data.keys())
     total_comparisons = len(note_paths) * (len(note_paths) - 1) // 2
     
-    print(f"총 {total_comparisons}개 비교 수행 중...")
+    print(f"총 {total_comparisons}개 비교 수행 중... (노트 수: {len(note_paths)})")
     
     comparison_count = 0
     for i, source_path in enumerate(note_paths):
@@ -589,7 +624,9 @@ def find_related_notes(notes_data: Dict[str, Dict], config: Dict) -> Dict[str, L
         # 유사도 기준으로 정렬하고 최대 갯수만큼 유지
         if source_related:
             source_related.sort(key=lambda x: x['similarity'], reverse=True)
+            original_count = len(source_related)
             source_related = source_related[:max_backlinks]
+            print(f"  - {os.path.basename(source_path)}: 관련 노트 {original_count}개 중 {len(source_related)}개 선택 (max_backlinks={max_backlinks})")
             related_notes[source_path] = source_related
         
         # 진행 상황 출력
@@ -602,6 +639,11 @@ def find_related_notes(notes_data: Dict[str, Dict], config: Dict) -> Dict[str, L
 def update_notes_with_backlinks(related_notes: Dict[str, List[Dict]], config: Dict) -> None:
     """백링크 정보로 노트들을 업데이트합니다."""
     print("백링크 정보로 노트 업데이트 시작...")
+    
+    # 임베딩 관련 설정 출력
+    embedding_config = config.get("embedding", {})
+    max_backlinks = embedding_config.get("max_backlinks", 7)
+    print(f"설정된 max_backlinks: {max_backlinks}")
     
     # 병렬 처리 설정
     parallel = config.get("parallel_processing", False)
@@ -695,7 +737,7 @@ def update_notes_with_backlinks(related_notes: Dict[str, List[Dict]], config: Di
             with open(file_path, 'w', encoding='utf-8') as f:
                 f.write(updated_note)
                 
-            print(f"  - 완료: 백링크 추가 ({os.path.basename(file_path)})")
+            print(f"  - 완료: 백링크 {len(related_items)}개 추가 ({os.path.basename(file_path)})")
             return (file_path, True)
                 
         except Exception as e:
@@ -743,15 +785,20 @@ def main():
     test_mode = config.get("test_mode", False)
     if test_mode:
         print("테스트 모드로 실행됩니다.")
+    
+    # 임베딩 설정 확인 및 출력
+    embedding_config = config.get("embedding", {})
+    max_backlinks = embedding_config.get("max_backlinks", 7)
+    print(f"현재 max_backlinks 설정: {max_backlinks}")
    
-    # 1. 모든 노트의 임베딩 생성
+    # 1. 모든 노트의 임베딩 생성 (기존 임베딩 포함)
     notes_data = process_vault_embeddings(config)
    
     if not notes_data:
         print("처리된 노트가 없습니다. 프로그램을 종료합니다.")
         return
    
-    # 2. 관련 노트 탐색
+    # 2. 관련 노트 탐색 (전체 노트 데이터 사용)
     related_notes = find_related_notes(notes_data, config)
    
     if not related_notes:

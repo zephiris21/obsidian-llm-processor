@@ -38,7 +38,7 @@
     ],
     "embedding": {
         "similarity_threshold": 0.7,
-        "max_backlinks": 3,
+        "max_backlinks": 5,
         "jsonl_path": "D:\\z-vault\\.vectors\\embeddings.jsonl"
     },
     "api_settings": {

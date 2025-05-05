@@ -190,11 +190,14 @@ def main():
                 log_processing("요약 생성 중 오류로 임베딩 처리 건너뜀")
                 return
             
-            # 임베딩은 증분 처리지만 백링크는 전체 재계산
+            # 임베딩은 전체 재처리로 변경
+            print("임베딩 처리를 위해 force_reprocess를 true로 설정합니다.")
+            config['force_reprocess'] = True
+            save_config(config)
+            log_processing("임베딩 처리를 위해 force_reprocess=True로 설정")
+            
+            # 임베딩 및 백링크 생성
             success2, stats2 = run_script("obsidian_embedding.py", "2. 노트 임베딩 및 백링크 생성")
-            if not success2:
-                print("임베딩 생성 중 오류가 발생했습니다.")
-                log_processing("임베딩 생성 중 오류 발생")
                 
         elif mode == '3':  # 요약만 처리
             print("새로운/변경된 노트만 요약 생성합니다.")
