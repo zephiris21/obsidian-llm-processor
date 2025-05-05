@@ -1,0 +1,53 @@
+{
+    "model": "gemma3:12b",
+    "embedding_model": "mxbai-embed-large",
+    "vault_paths": [
+        "D:\\z-vault\\03. Knowledge",
+        "D:\\z-vault\\01. Think & Plan",
+        "D:\\z-vault\\02. Projects",
+        "D:\\z-vault\\00. News"
+    ],
+    "skip_categories": [
+        "knowledge",
+        "plan",
+        "main-project"
+    ],
+    "exclude_directories": [
+        "D:\\z-vault\\00. News\\original"
+    ],
+    "min_content_length": {
+        "summary": 100,
+        "embedding": 100
+    },
+    "summary_length": {
+        "short": 1,
+        "medium": 3,
+        "long": 4
+    },
+    "tag_count": {
+        "min": 3,
+        "max": 5
+    },
+    "metadata_fields": [
+        "title",
+        "category",
+        "summary",
+        "tags",
+        "source",
+        "date"
+    ],
+    "embedding": {
+        "similarity_threshold": 0.7,
+        "max_backlinks": 3,
+        "jsonl_path": "D:\\z-vault\\.vectors\\embeddings.jsonl"
+    },
+    "api_settings": {
+        "temperature": 0.1,
+        "top_p": 0.9,
+        "max_tokens": 500
+    },
+    "parallel_processing": true,
+    "num_workers": 8,
+    "test_mode": false,
+    "force_reprocess": true
+}
