@@ -212,7 +212,7 @@ def main():
                 
         elif mode == '4':  # 전체 임베딩 처리
             print("임베딩을 생성하고 모든 백링크를 재계산합니다.")
-            config['force_reprocess'] = False  # 임베딩만 증분 처리
+            config['force_reprocess'] = True  # 임베딩만 증분 처리
             save_config(config)
             
             # 임베딩 생성

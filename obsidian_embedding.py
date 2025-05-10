@@ -429,6 +429,7 @@ def process_vault_embeddings(config: Dict) -> Dict[str, Dict]:
     parallel = config.get("parallel_processing", False)
     num_workers = config.get("num_workers", 4)
     
+    
     def process_single_note(file_path):
         """단일 노트 처리 및 임베딩 생성"""
         try:
@@ -483,12 +484,37 @@ def process_vault_embeddings(config: Dict) -> Dict[str, Dict]:
             with open(file_path, 'w', encoding='utf-8') as f:
                 f.write(updated_note)
             
+            # 파일 시간 속성 추출
+            try:
+                # 생성 시간
+                created_timestamp = os.path.getctime(file_path)
+                created_date = datetime.fromtimestamp(created_timestamp).isoformat()
+                
+                # 수정 시간
+                modified_timestamp = os.path.getmtime(file_path)
+                modified_date = datetime.fromtimestamp(modified_timestamp).isoformat()
+                
+                # 접근 시간
+                accessed_timestamp = os.path.getatime(file_path)
+                accessed_date = datetime.fromtimestamp(accessed_timestamp).isoformat()
+                
+                # 파일 크기 (바이트)
+                file_size = os.path.getsize(file_path)
+            except Exception as e:
+                print(f"  - 경고: 파일 속성 추출 중 오류 발생 ({os.path.basename(file_path)}): {e}")
+                created_date = modified_date = accessed_date = None
+                file_size = 0
+            
             # 노트 정보 저장
             note_info = {
                 'path': file_path,
                 'title': title,
                 'category': frontmatter.get('category', ''),
-                'embedding': embedding_vector
+                'embedding': embedding_vector,
+                'created_date': created_date,
+                'modified_date': modified_date,
+                'accessed_date': accessed_date,
+                'file_size': file_size
             }
             
             # 설정에 지정된 메타데이터 추가
@@ -501,6 +527,7 @@ def process_vault_embeddings(config: Dict) -> Dict[str, Dict]:
             
         except Exception as e:
             print(f"  - 오류: {os.path.basename(file_path)} - {str(e)}")
+            return None
             return None
     
     # 노트 처리 (병렬 또는 순차)
