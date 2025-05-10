@@ -1,6 +1,6 @@
 {
     "model": "gemma3:12b",
-    "embedding_model": "mxbai-embed-large",
+    "embedding_model": "chatfire/bge-m3:q8_0",
     "vault_paths": [
         "D:\\z-vault\\03. Knowledge",
         "D:\\z-vault\\01. Think & Plan",
